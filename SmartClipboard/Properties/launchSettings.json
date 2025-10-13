@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "SmartClipboard (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "SmartClipboard (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
