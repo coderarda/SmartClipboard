@@ -51,8 +51,17 @@ jobs:
       shell: pwsh
       run: |
         $pfx_cert_byte = [System.Convert]::FromBase64String("${{ secrets.SIGNING_CERTIFICATE }}")
-        Set-Content -Path "GitHubActionsWorkflow.pfx" -Value $bytes -Encoding Byte
-        
+        [System.IO.File]::WriteAllBytes("GitHubActionsWorkflow.pfx", $bytes
+
+
+    - name: Verify pfx exists
+      run: |
+        if (Test-Path "GitHubActionsWorkflow.pfx") {
+          Write-Host "PFX file created successfully."
+        } else {
+          Write-Error "PFX file not found!"
+        }
+      shell: pwsh
     # Create the app package by building and packaging the project
     - name: Create the app package
       run: msbuild $env:Solution_Name /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:UapAppxPackageBuildMode=$env:Appx_Package_Build_Mode /p:AppxBundle=$env:Appx_Bundle /p:PackageCertificateKeyFile=GitHubActionsWorkflow.pfx /p:AppxPackageDir="$env:Appx_Package_Dir" /p:GenerateAppxPackageOnBuild=true /p:PackageCertificatePassword=${{ secrets.SIGNING_PASSWORD }} 
