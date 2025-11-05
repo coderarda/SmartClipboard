@@ -51,7 +51,7 @@ jobs:
       shell: pwsh
       run: |
         $pfx_cert_byte = [System.Convert]::FromBase64String("${{ secrets.SIGNING_CERTIFICATE }}")
-        [IO.File]::WriteAllBytes("GitHubActionsWorkflow.pfx", $pfx_cert_byte)
+        Set-Content -Path "GitHubActionsWorkflow.pfx" -Value $bytes -Encoding Byte
         
     # Create the app package by building and packaging the project
     - name: Create the app package
