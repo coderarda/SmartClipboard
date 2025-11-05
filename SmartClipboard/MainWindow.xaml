@@ -7,7 +7,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="SmartClipboard">
+    Title="Smart Clipboard">
 
     <Window.SystemBackdrop>
         <MicaBackdrop />
@@ -15,12 +15,53 @@
 
     <Grid x:Name="RootGrid">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        <!-- Other content can go here in Row 0 -->
-        <ListView Grid.Row="0" Margin="10 25 10 5" x:Name="ClipboardListView" />
+        
+        <!-- Custom Title Bar -->
+        <Grid x:Name="AppTitleBar" Grid.Row="0" Height="48">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Title -->
+            <TextBlock 
+                Grid.Column="0"
+                Text="Smart Clipboard" 
+                Style="{StaticResource CaptionTextBlockStyle}" 
+                VerticalAlignment="Center"
+                Margin="16,0,0,0" />
+        </Grid>
+        
+        <!-- Settings Button Row -->
+        <Grid Grid.Row="1">
+            <Button 
+                HorizontalAlignment="Right" 
+                Margin="0,8,8,8" 
+                Click="SettingsButton_Click"
+                Background="Transparent"
+                BorderBrush="Transparent"
+                Padding="8"
+                CornerRadius="4"
+                VerticalAlignment="Center">
+                <Button.Resources>
+                    <ResourceDictionary>
+                        <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="Transparent" Opacity="0.1"/>
+                        <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="Transparent" Opacity="0.2"/>
+                        <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="Transparent"/>
+                        <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="Transparent"/>
+                    </ResourceDictionary>
+                </Button.Resources>
+                <FontIcon Glyph="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="16" />
+            </Button>
+        </Grid>
+
+        <ListView Grid.Row="2" Margin="10 5 10 5" x:Name="ClipboardListView" />
         <!-- ListView items can be defined here -->
-            <TextBox Grid.Row="1" Margin="20" TextChanged="TextBox_TextChanged" PlaceholderText="Search..." />
+        <TextBox Grid.Row="3" Margin="20" TextChanged="TextBox_TextChanged" PlaceholderText="Search..." />
     </Grid>
 </Window>

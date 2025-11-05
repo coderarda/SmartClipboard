@@ -86,6 +86,8 @@ namespace SmartClipboard {
             InitializeComponent();
 
             ExtendsContentIntoTitleBar = true;
+            SetTitleBar(AppTitleBar);
+            
             Title = "SmartClipboard";
 
             // Set window size using AppWindow
@@ -240,6 +242,12 @@ namespace SmartClipboard {
 
             SetWindowPos(_hwnd, new IntPtr(-1), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
             SetWindowPos(_hwnd, new IntPtr(-2), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+        }
+
+        private void SettingsButton_Click(object sender, RoutedEventArgs e) {
+            // Open settings window
+            SettingsWindow settingsWindow = new SettingsWindow();
+            settingsWindow.Activate();
         }
 
         private void TextBox_TextChanged(object sender, TextChangedEventArgs e) {

@@ -1,6 +1,7 @@
 ﻿using System;
-using System.Runtime.InteropServices;
 using System.IO;
+using System.Runtime.InteropServices;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 public class NotifyIconManager {
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -92,7 +93,6 @@ public class NotifyIconManager {
         AppendMenu(hMenu, MF_STRING, MENU_SHOW, "Show");
         AppendMenu(hMenu, MF_SEPARATOR, 0, string.Empty);
         AppendMenu(hMenu, MF_STRING, MENU_EXIT, "Exit");
-
         GetCursorPos(out POINT pt);
         SetForegroundWindow(_hwnd);
 
