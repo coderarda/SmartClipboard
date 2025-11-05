@@ -48,6 +48,7 @@ jobs:
 
     # Decode the base 64 encoded pfx and save the Signing_Certificate
     - name: Decode the pfx
+    - shell: pwsh
       run: |
         $pfx_cert_byte = [System.Convert]::FromBase64String("${{ secrets.SIGNING_CERTIFICATE }}")
         $certificatePath = "GitHubActionsWorkflow.pfx"
