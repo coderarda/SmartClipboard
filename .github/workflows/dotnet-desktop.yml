@@ -51,7 +51,7 @@ jobs:
       shell: pwsh
       run: |
         $pfx_cert_byte = [System.Convert]::FromBase64String("${{ secrets.SIGNING_CERTIFICATE }}")
-        [System.IO.File]::WriteAllBytes("GitHubActionsWorkflow.pfx", $bytes
+        [System.IO.File]::WriteAllBytes("GitHubActionsWorkflow.pfx", $bytes)
 
 
     - name: Verify pfx exists
