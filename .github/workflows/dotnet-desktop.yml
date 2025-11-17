@@ -62,9 +62,18 @@ jobs:
           Write-Error "PFX file not found!"
         }
       shell: pwsh
+      
+    - name: Get full path to pfx
+      id: pfxpath
+      shell: pwsh
+      run: |
+        $fullPath = Resolve-Path "GitHubActionsWorkflow.pfx"
+        echo "pfxpath=$fullPath" >> $env:GITHUB_ENV
+
+
     # Create the app package by building and packaging the project
     - name: Create the app package
-      run: msbuild $env:Solution_Name /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:UapAppxPackageBuildMode=$env:Appx_Package_Build_Mode /p:AppxBundle=$env:Appx_Bundle /p:PackageCertificateKeyFile=GitHubActionsWorkflow.pfx /p:AppxPackageDir="$env:Appx_Package_Dir" /p:GenerateAppxPackageOnBuild=true /p:PackageCertificatePassword=${{ secrets.SIGNING_PASSWORD }} 
+      run: msbuild $env:Solution_Name /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:UapAppxPackageBuildMode=$env:Appx_Package_Build_Mode /p:AppxBundle=$env:Appx_Bundle /p:PackageCertificateKeyFile=$env:pfxpath /p:AppxPackageDir="$env:Appx_Package_Dir" /p:GenerateAppxPackageOnBuild=true /p:PackageCertificatePassword=${{ secrets.SIGNING_PASSWORD }} 
 
       env:
         Appx_Bundle: Never
