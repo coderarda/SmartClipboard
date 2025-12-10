@@ -70,8 +70,9 @@ jobs:
         PFX_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
       run: |
         $secure = ConvertTo-SecureString $env:PFX_PASSWORD -AsPlainText -Force
-        $certs = Import-PfxCertificate -FilePath "$PWD\GitHubActionsWorkflow.pfx" -CertStoreLocation Cert:\CurrentUser\My -Password $secure -Exportable
-        if (-not $certs) { throw "Failed to import PFX into CurrentUser\My." }
+        $pfxPath = Join-Path (Get-Location) "GitHubActionsWorkflow.pfx"
+        $certs = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $secure -Exportable
+        if ($null -eq $certs -or $certs.Count -eq 0) { throw "Failed to import PFX into CurrentUser\My." }
         $thumb = ($certs | Select-Object -First 1).Thumbprint
         Write-Host "Imported certificate thumbprint: $thumb"
         echo "SigningCertThumbprint=$thumb" >> $env:GITHUB_ENV
