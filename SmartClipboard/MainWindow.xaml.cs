@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
@@ -26,11 +27,15 @@ namespace SmartClipboard {
     /// </summary>
     public sealed partial class MainWindow : Window {
         private readonly IntPtr _hwnd;
-        private readonly NotifyIconManager _tray;
+        private NotifyIconManager? _tray;
         private readonly AppWindow _appWindow;
 
         private int windowWidth = 300;
         private int windowHeight = 600;
+
+        private List<ClipboardItem> clipboardItems = new List<ClipboardItem>();
+        private bool savingEnabled = false;
+        private bool minimizeToTray = true;
 
         // Windows message constants
         private const int WM_USER = 0x0400;
@@ -97,10 +102,6 @@ namespace SmartClipboard {
             _newWndProc = new WndProcDelegate(WndProc);
             _oldWndProc = SetWindowLongPtr(_hwnd, GWL_WNDPROC, Marshal.GetFunctionPointerForDelegate(_newWndProc));
 
-            // Create tray icon
-            _tray = new NotifyIconManager(_hwnd);
-            _tray.CreateTrayIcon("Smart Clipboard", "SMARTCLIPBOARD.ico");
-
             var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(_hwnd);
             _appWindow = AppWindow.GetFromWindowId(windowId);
 
@@ -114,7 +115,54 @@ namespace SmartClipboard {
             // Handle window closing to hide to tray instead
             _appWindow.Closing += OnWindowClosing;
 
-            // Customize the title bar to look native
+            // Load clipboard items
+            LoadClipboardData();
+            
+            // Load settings and create tray icon if needed
+            LoadSettings();
+        }
+
+        private async void LoadSettings() {
+            try {
+                var settingsPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "SmartClipboard",
+                    "settings.json"
+                );
+
+                if(File.Exists(settingsPath)) {
+                    var json = await File.ReadAllTextAsync(settingsPath);
+                    var settings = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(json);
+                    
+                    if(settings != null) {
+                        minimizeToTray = settings.MinimizeToTray;
+                        savingEnabled = settings.SavingEnabled;
+                    }
+                }
+                
+                // Create or remove tray icon based on setting
+                UpdateTrayIcon();
+            }
+            catch(Exception ex) {
+                System.Diagnostics.Debug.WriteLine($"Error loading settings: {ex.Message}");
+                // Default to tray enabled
+                UpdateTrayIcon();
+            }
+        }
+
+        private void UpdateTrayIcon() {
+            if(minimizeToTray) {
+                if(_tray == null) {
+                    _tray = new NotifyIconManager(_hwnd);
+                    _tray.CreateTrayIcon("Smart Clipboard", "SMARTCLIPBOARD.ico");
+                }
+            }
+            else {
+                if(_tray != null) {
+                    _tray.RemoveTrayIcon();
+                    _tray = null;
+                }
+            }
         }
 
         private async void OnClipboardContentChanged(object? sender, object e) {
@@ -122,14 +170,22 @@ namespace SmartClipboard {
             if(dataPackageView.Contains(StandardDataFormats.Text)) {
                 var text = await dataPackageView.GetTextAsync();
                 if(!ClipboardListView.Items.Any(item => (item as ClipboardContentView)?.ClipboardContent == text)) {
-                    ClipboardListView.Items.Add(new ClipboardContentView(text));
+                    var clipboardView = new ClipboardContentView(text);
+                    ClipboardListView.Items.Add(clipboardView);
+
+                    var clipboardItem = new ClipboardItem(text);
+                    clipboardItems.Add(clipboardItem);
+
+                    if(savingEnabled) {
+                        await SaveClipboardData();
+                    }
                 }
             }
         }
 
         private IntPtr WndProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam) {
-            // Handle tray icon messages
-            if(msg == WM_USER) {
+            // Handle tray icon messages only if tray is enabled
+            if(msg == WM_USER && _tray != null) {
                 int notificationMsg = (int)lParam & 0xFFFF;
 
                 if(notificationMsg == WM_LBUTTONUP) {
@@ -165,17 +221,38 @@ namespace SmartClipboard {
         }
 
         private void ExitApplication() {
-            // Remove tray icon
-            _tray.RemoveTrayIcon();
+            // Remove tray icon if it exists
+            if(_tray != null) {
+                _tray.RemoveTrayIcon();
+            }
+
+            // Save clipboard data if enabled (fire and forget - best effort)
+            if(savingEnabled) {
+                _ = SaveClipboardData();
+            }
 
             // Actually close the application
             Application.Current.Exit();
         }
 
         private void OnWindowClosing(AppWindow sender, AppWindowClosingEventArgs args) {
-            // Prevent actual closing and hide to tray instead
-            args.Cancel = true;
-            _appWindow.Hide();
+            // If minimize to tray is enabled, hide the window instead of closing
+            if(minimizeToTray) {
+                args.Cancel = true;
+                _appWindow.Hide();
+            }
+            else {
+                // Allow window to close normally
+                // Remove tray icon if it exists
+                if(_tray != null) {
+                    _tray.RemoveTrayIcon();
+                }
+                
+                // Save clipboard data if enabled (fire and forget - best effort)
+                if(savingEnabled) {
+                    _ = SaveClipboardData();
+                }
+            }
         }
 
         private void PositionWindowNearTaskbar() {
@@ -278,5 +355,37 @@ namespace SmartClipboard {
                 }
             }
         }
+
+        private async void LoadClipboardData() {
+            clipboardItems = await StorageManager.LoadClipboardItemsAsync();
+            
+            foreach(var item in clipboardItems) {
+                var clipboardView = new ClipboardContentView(item.Content, item.Timestamp);
+                ClipboardListView.Items.Add(clipboardView);
+            }
+            
+            System.Diagnostics.Debug.WriteLine($"Loaded {clipboardItems.Count} clipboard items");
+        }
+
+        private async Task SaveClipboardData() {
+            await StorageManager.SaveClipboardItemsAsync(clipboardItems);
+            System.Diagnostics.Debug.WriteLine("Clipboard items saved");
+        }
+
+        public void SetSavingEnabled(bool enabled) {
+            savingEnabled = enabled;
+            System.Diagnostics.Debug.WriteLine($"Saving enabled: {enabled}");
+        }
+
+        public void SetMinimizeToTray(bool enabled) {
+            minimizeToTray = enabled;
+            UpdateTrayIcon();
+            System.Diagnostics.Debug.WriteLine($"Minimize to tray: {enabled}");
+        }
+    }
+    
+    public class AppSettings {
+        public bool SavingEnabled { get; set; }
+        public bool MinimizeToTray { get; set; } = true;
     }
 }

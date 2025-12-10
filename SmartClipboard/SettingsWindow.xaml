@@ -36,8 +36,11 @@
         </Grid>
 
         <!-- Main Content Area -->
-        <Grid Grid.Row="1">
+        <StackPanel Orientation="Vertical" Grid.Row="1">
             <!-- Your settings content goes here -->
-        </Grid>
+            <CheckBox x:Name="CheckBox1" Checked="CheckBox_Checked" Unchecked="CheckBox_Unchecked" Content="Open at startup" Margin="16" />
+            <CheckBox x:Name="CheckBox2" Checked="CheckBox2_Checked" Unchecked="CheckBox2_Unchecked" Content="Save history of clipboard" Margin="16" />
+            <CheckBox x:Name="CheckBox3" Checked="CheckBox3_Checked" Unchecked="CheckBox3_Unchecked" Content="Minimize when closed" Margin="16" />
+        </StackPanel>
     </Grid>
 </Window>

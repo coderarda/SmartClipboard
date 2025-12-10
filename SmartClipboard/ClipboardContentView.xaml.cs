@@ -42,10 +42,20 @@ namespace SmartClipboard {
             }
         }
 
+        public DateTime CreatedAt { get; private set; }
+
         public ClipboardContentView(string content) {
             this.InitializeComponent();
             _clipboardContent = content;
-            _timestamp = DateTime.Now.ToString("HH:mm");
+            CreatedAt = DateTime.Now;
+            _timestamp = CreatedAt.ToString("HH:mm");
+        }
+
+        public ClipboardContentView(string content, DateTime timestamp) {
+            this.InitializeComponent();
+            _clipboardContent = content;
+            CreatedAt = timestamp;
+            _timestamp = timestamp.ToString("HH:mm");
         }
 
         private void CopyButton_Click(object sender, RoutedEventArgs e) {
