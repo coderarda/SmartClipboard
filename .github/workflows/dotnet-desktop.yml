@@ -63,16 +63,23 @@ jobs:
         }
       shell: pwsh
       
-    - name: Get full path to pfx
-      id: pfxpath
+    - name: Import signing certificate
+      if: ${{ secrets.SIGNING_PASSWORD != '' }}
       shell: pwsh
+      env:
+        PFX_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
       run: |
-        $fullPath = Resolve-Path "GitHubActionsWorkflow.pfx"
-        echo "pfxpath=$fullPath" >> $env:GITHUB_ENV
+        $secure = ConvertTo-SecureString $env:PFX_PASSWORD -AsPlainText -Force
+        $certs = Import-PfxCertificate -FilePath "$PWD\GitHubActionsWorkflow.pfx" -CertStoreLocation Cert:\CurrentUser\My -Password $secure -Exportable
+        if (-not $certs) { throw "Failed to import PFX into CurrentUser\My." }
+        $thumb = ($certs | Select-Object -First 1).Thumbprint
+        Write-Host "Imported certificate thumbprint: $thumb"
+        echo "SigningCertThumbprint=$thumb" >> $env:GITHUB_ENV
 
 
-    # Create the app package by building and packaging the project
+    # Create the app package by building and packaging the project (signed)
     - name: Create the app package
+      if: ${{ secrets.SIGNING_PASSWORD != '' }}
       run: >
         msbuild $env:Solution_Name
         /p:Configuration=$env:Configuration
@@ -80,9 +87,27 @@ jobs:
         /p:UapAppxPackageBuildMode=$env:Appx_Package_Build_Mode
         /p:AppxBundle=$env:Appx_Bundle
         /p:AppxPackageDir=$env:Appx_Package_Dir
-        /p:PackageCertificateKeyFile="${{ env.pfxpath }}"
-        /p:PackageCertificatePassword="${{ secrets.SIGNING_PASSWORD }}"
-        /p:PackageCertificateThumbprint=""
+        /p:PackageCertificateThumbprint=$env:SigningCertThumbprint
+        /p:PackageCertificateKeyFile=
+        /p:PackageCertificatePassword=
+      env:
+        Appx_Bundle: Never
+        Appx_Package_Build_Mode: SideloadOnly
+        Appx_Package_Dir: Packages\
+        Configuration: ${{ matrix.configuration }}
+        Platform: ${{ matrix.platform }}
+
+    # Create the app package (unsigned fallback when secrets not available)
+    - name: Create the app package (unsigned)
+      if: ${{ secrets.SIGNING_PASSWORD == '' }}
+      run: >
+        msbuild $env:Solution_Name
+        /p:Configuration=$env:Configuration
+        /p:Platform=$env:Platform
+        /p:UapAppxPackageBuildMode=$env:Appx_Package_Build_Mode
+        /p:AppxBundle=$env:Appx_Bundle
+        /p:AppxPackageDir=$env:Appx_Package_Dir
+        /p:AppxPackageSigningEnabled=false
       env:
         Appx_Bundle: Never
         Appx_Package_Build_Mode: SideloadOnly
@@ -92,11 +117,12 @@ jobs:
 
     # Remove the pfx
     - name: Remove the pfx
+      if: ${{ secrets.SIGNING_PASSWORD != '' }}
       run: Remove-Item -path GitHubActionsWorkflow.pfx
 
     # Upload the MSIX package: https://github.com/marketplace/actions/upload-a-build-artifact
     - name: Upload MSIX package
       uses: actions/upload-artifact@v4
       with:
-        name: MSIX Package
+        name: MSIX Package (${{ matrix.configuration }}-${{ matrix.platform }})
         path: ${{ env.Solution_Name }}\\Packages
