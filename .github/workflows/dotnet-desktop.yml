@@ -37,9 +37,9 @@ jobs:
         SIGNING_PASSWORD:  ${{ secrets.SIGNING_PASSWORD }}
       run: |
         if ([string]::IsNullOrEmpty($env:SIGNING_PASSWORD)) {
-          echo "signing_available=false" >> $env: GITHUB_OUTPUT
+          echo "signing_available=false" >> $env:GITHUB_OUTPUT
         } else {
-          echo "signing_available=true" >> $env: GITHUB_OUTPUT
+          echo "signing_available=true" >> $env:GITHUB_OUTPUT
         }
       shell: pwsh
     
