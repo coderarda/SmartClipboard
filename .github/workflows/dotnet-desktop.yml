@@ -31,6 +31,18 @@ jobs:
         fetch-depth: 0
 
     # Install the .NET Core workload
+    - name: Check if signing is available
+      id: check-signing
+      env:
+        SIGNING_PASSWORD:  ${{ secrets.SIGNING_PASSWORD }}
+      run: |
+        if ([string]::IsNullOrEmpty($env:SIGNING_PASSWORD)) {
+          echo "signing_available=false" >> $env: GITHUB_OUTPUT
+        } else {
+          echo "signing_available=true" >> $env: GITHUB_OUTPUT
+        }
+      shell: pwsh
+    
     - name: Install .NET Core
       uses: actions/setup-dotnet@v4
       with:
@@ -64,7 +76,6 @@ jobs:
       shell: pwsh
       
     - name: Import signing certificate
-      if: ${{ secrets.SIGNING_PASSWORD != '' }}
       shell: pwsh
       env:
         PFX_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
@@ -80,7 +91,6 @@ jobs:
 
     # Create the app package by building and packaging the project (signed)
     - name: Create the app package
-      if: ${{ secrets.SIGNING_PASSWORD != '' }}
       run: >
         msbuild $env:Solution_Name
         /p:Configuration=$env:Configuration
@@ -100,7 +110,6 @@ jobs:
 
     # Create the app package (unsigned fallback when secrets not available)
     - name: Create the app package (unsigned)
-      if: ${{ secrets.SIGNING_PASSWORD == '' }}
       run: >
         msbuild $env:Solution_Name
         /p:Configuration=$env:Configuration
@@ -118,7 +127,6 @@ jobs:
 
     # Remove the pfx
     - name: Remove the pfx
-      if: ${{ secrets.SIGNING_PASSWORD != '' }}
       run: Remove-Item -path GitHubActionsWorkflow.pfx
 
     # Upload the MSIX package: https://github.com/marketplace/actions/upload-a-build-artifact
