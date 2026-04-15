@@ -44,6 +44,8 @@ namespace SmartClipboard {
 
         public DateTime CreatedAt { get; private set; }
 
+        public event EventHandler? DeleteRequested;
+
         public ClipboardContentView(string content) {
             this.InitializeComponent();
             _clipboardContent = content;
@@ -67,5 +69,9 @@ namespace SmartClipboard {
         public event PropertyChangedEventHandler? PropertyChanged;
         private void OnPropertyChanged(string propertyName) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+        private void DeleteButton_Click(object sender, RoutedEventArgs e) {
+            DeleteRequested?.Invoke(this, EventArgs.Empty);
+        }
     }
 }

@@ -30,15 +30,17 @@ namespace SmartClipboard {
         private NotifyIconManager? _tray;
         private readonly AppWindow _appWindow;
 
-        private int windowWidth = 300;
+        private int windowWidth = 350;
         private int windowHeight = 600;
 
         private List<ClipboardItem> clipboardItems = new List<ClipboardItem>();
         private bool savingEnabled = false;
         private bool minimizeToTray = true;
+        private SettingsWindow? _settingsWindow = null;
 
         // Windows message constants
         private const int WM_USER = 0x0400;
+        private const int WM_CLIPBOARDUPDATE = 0x031D;
         private const int WM_LBUTTONUP = 0x0202;
         private const int WM_RBUTTONUP = 0x0205;
 
@@ -52,6 +54,12 @@ namespace SmartClipboard {
         private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 
         [DllImport("user32.dll")]
+        private static extern bool AddClipboardFormatListener(IntPtr hwnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool RemoveClipboardFormatListener(IntPtr hwnd);
+
+        [DllImport("user32.dll")]
         private static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
 
         [DllImport("user32.dll")]
@@ -62,6 +70,9 @@ namespace SmartClipboard {
 
         [DllImport("user32.dll")]
         private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+        [DllImport("user32.dll")]
+        private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
 
         [StructLayout(LayoutKind.Sequential)]
         public struct RECT {
@@ -80,10 +91,14 @@ namespace SmartClipboard {
         }
 
         private const int GWL_WNDPROC = -4;
+        private const int GWL_STYLE = -16;
         private const uint MONITOR_DEFAULTTONEAREST = 2;
+        private const int WS_THICKFRAME = 0x00040000;
+        private const int WS_MAXIMIZEBOX = 0x00010000;
 
         private IntPtr _oldWndProc;
         private WndProcDelegate _newWndProc;
+        private bool _clipboardListenerRegistered;
 
         private delegate IntPtr WndProcDelegate(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
@@ -107,7 +122,14 @@ namespace SmartClipboard {
 
             _appWindow.Resize(new SizeInt32(windowWidth, windowHeight));
 
+            // Make window fixed size by removing resize frame and maximize box
+            int style = GetWindowLong(_hwnd, GWL_STYLE);
+            style &= ~WS_THICKFRAME; // Remove resize frame
+            style &= ~WS_MAXIMIZEBOX; // Remove maximize box
+            SetWindowLongPtr(_hwnd, GWL_STYLE, new IntPtr(style));
+
             Clipboard.ContentChanged += new EventHandler<object>(OnClipboardContentChanged);
+            _clipboardListenerRegistered = AddClipboardFormatListener(_hwnd);
 
             // Position window near taskbar on startup
             PositionWindowNearTaskbar();
@@ -166,24 +188,40 @@ namespace SmartClipboard {
         }
 
         private async void OnClipboardContentChanged(object? sender, object e) {
-            DataPackageView dataPackageView = Clipboard.GetContent();
-            if(dataPackageView.Contains(StandardDataFormats.Text)) {
-                var text = await dataPackageView.GetTextAsync();
-                if(!ClipboardListView.Items.Any(item => (item as ClipboardContentView)?.ClipboardContent == text)) {
-                    var clipboardView = new ClipboardContentView(text);
-                    ClipboardListView.Items.Add(clipboardView);
+            await ProcessClipboardContentChangeAsync();
+        }
 
-                    var clipboardItem = new ClipboardItem(text);
-                    clipboardItems.Add(clipboardItem);
+        private async Task ProcessClipboardContentChangeAsync() {
+            try {
+                DataPackageView dataPackageView = Clipboard.GetContent();
+                if(dataPackageView.Contains(StandardDataFormats.Text)) {
+                    var text = await dataPackageView.GetTextAsync();
+                    if(!ClipboardListView.Items.Any(item => (item as ClipboardContentView)?.ClipboardContent == text)) {
+                        var clipboardView = new ClipboardContentView(text);
+                        clipboardView.DeleteRequested += ClipboardView_DeleteRequested;
+                        ClipboardListView.Items.Insert(0, clipboardView);
 
-                    if(savingEnabled) {
-                        await SaveClipboardData();
+                        var clipboardItem = new ClipboardItem(text);
+                        clipboardItems.Insert(0, clipboardItem);
+
+                        if(savingEnabled) {
+                            await SaveClipboardData();
+                        }
                     }
                 }
+            }
+            catch(Exception ex) {
+                System.Diagnostics.Debug.WriteLine($"Error processing clipboard content: {ex.Message}");
             }
         }
 
         private IntPtr WndProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam) {
+            if(msg == WM_CLIPBOARDUPDATE) {
+                DispatcherQueue.TryEnqueue(() => {
+                    _ = ProcessClipboardContentChangeAsync();
+                });
+            }
+
             // Handle tray icon messages only if tray is enabled
             if(msg == WM_USER && _tray != null) {
                 int notificationMsg = (int)lParam & 0xFFFF;
@@ -226,6 +264,11 @@ namespace SmartClipboard {
                 _tray.RemoveTrayIcon();
             }
 
+            if(_clipboardListenerRegistered) {
+                RemoveClipboardFormatListener(_hwnd);
+                _clipboardListenerRegistered = false;
+            }
+
             // Save clipboard data if enabled (fire and forget - best effort)
             if(savingEnabled) {
                 _ = SaveClipboardData();
@@ -246,6 +289,11 @@ namespace SmartClipboard {
                 // Remove tray icon if it exists
                 if(_tray != null) {
                     _tray.RemoveTrayIcon();
+                }
+
+                if(_clipboardListenerRegistered) {
+                    RemoveClipboardFormatListener(_hwnd);
+                    _clipboardListenerRegistered = false;
                 }
                 
                 // Save clipboard data if enabled (fire and forget - best effort)
@@ -322,9 +370,35 @@ namespace SmartClipboard {
         }
 
         private void SettingsButton_Click(object sender, RoutedEventArgs e) {
-            // Open settings window
-            SettingsWindow settingsWindow = new SettingsWindow();
-            settingsWindow.Activate();
+            // Check if settings window already exists and is open
+            if (_settingsWindow != null) {
+                // Bring existing window to front
+                _settingsWindow.Activate();
+            }
+            else {
+                // Create new settings window
+                _settingsWindow = new SettingsWindow();
+
+                // Handle window closed event to clear the reference
+                _settingsWindow.Closed += (s, args) => {
+                    _settingsWindow = null;
+                };
+
+                _settingsWindow.Activate();
+            }
+        }
+
+        private async void ClearHistoryButton_Click(object sender, RoutedEventArgs e) {
+            // Clear the UI list
+            ClipboardListView.Items.Clear();
+            
+            // Clear the in-memory list
+            clipboardItems.Clear();
+            
+            // Clear the saved data
+            await StorageManager.ClearClipboardItemsAsync();
+            
+            System.Diagnostics.Debug.WriteLine("Clipboard history cleared");
         }
 
         private void TextBox_TextChanged(object sender, TextChangedEventArgs e) {
@@ -357,10 +431,13 @@ namespace SmartClipboard {
         }
 
         private async void LoadClipboardData() {
-            clipboardItems = await StorageManager.LoadClipboardItemsAsync();
+            clipboardItems = (await StorageManager.LoadClipboardItemsAsync())
+                .OrderByDescending(item => item.Timestamp)
+                .ToList();
             
             foreach(var item in clipboardItems) {
                 var clipboardView = new ClipboardContentView(item.Content, item.Timestamp);
+                clipboardView.DeleteRequested += ClipboardView_DeleteRequested;
                 ClipboardListView.Items.Add(clipboardView);
             }
             
@@ -370,6 +447,27 @@ namespace SmartClipboard {
         private async Task SaveClipboardData() {
             await StorageManager.SaveClipboardItemsAsync(clipboardItems);
             System.Diagnostics.Debug.WriteLine("Clipboard items saved");
+        }
+
+        private async void ClipboardView_DeleteRequested(object? sender, EventArgs e) {
+            if(sender is not ClipboardContentView clipboardView) {
+                return;
+            }
+
+            ClipboardListView.Items.Remove(clipboardView);
+            clipboardView.DeleteRequested -= ClipboardView_DeleteRequested;
+
+            var itemToRemove = clipboardItems.FirstOrDefault(item =>
+                item.Content == clipboardView.ClipboardContent &&
+                item.Timestamp == clipboardView.CreatedAt);
+
+            if(itemToRemove != null) {
+                clipboardItems.Remove(itemToRemove);
+            }
+
+            if(savingEnabled) {
+                await SaveClipboardData();
+            }
         }
 
         public void SetSavingEnabled(bool enabled) {

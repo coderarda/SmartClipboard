@@ -30,13 +30,18 @@
                            FontSize="11"
                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
             </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Content="&#xE74D;"
+                        FontFamily="Segoe MDL2 Assets" 
+                        ToolTipService.ToolTip="Delete item"
+                        Click="DeleteButton_Click"/>
+                <Button Content="&#xE8C8;"
+                        FontFamily="Segoe MDL2 Assets"
+                        Background="Transparent"
+                        Click="CopyButton_Click"
+                        ToolTipService.ToolTip="Copy to clipboard" />
+            </StackPanel>
 
-            <Button Grid.Column="1"
-                    Content="&#xE8C8;"
-                    FontFamily="Segoe MDL2 Assets"
-                    Background="Transparent"
-                    Click="CopyButton_Click"
-                    ToolTipService.ToolTip="Copy to clipboard" />
         </Grid>
     </Border>
 </UserControl>

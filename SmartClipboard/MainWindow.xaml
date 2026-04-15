@@ -37,27 +37,50 @@
                 Margin="16,0,0,0" />
         </Grid>
         
-        <!-- Settings Button Row -->
+        <!-- Buttons Row -->
         <Grid Grid.Row="1">
-            <Button 
-                HorizontalAlignment="Right" 
-                Margin="0,8,8,8" 
-                Click="SettingsButton_Click"
-                Background="Transparent"
-                BorderBrush="Transparent"
-                Padding="8"
-                CornerRadius="4"
-                VerticalAlignment="Center">
-                <Button.Resources>
-                    <ResourceDictionary>
-                        <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="Transparent" Opacity="0.1"/>
-                        <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="Transparent" Opacity="0.2"/>
-                        <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="Transparent"/>
-                        <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="Transparent"/>
-                    </ResourceDictionary>
-                </Button.Resources>
-                <FontIcon Glyph="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="16" />
-            </Button>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,8,8">
+                <!-- Clear History Button -->
+                <Button 
+                    Click="ClearHistoryButton_Click"
+                    Background="Transparent"
+                    BorderBrush="Transparent"
+                    Padding="8"
+                    CornerRadius="4"
+                    VerticalAlignment="Center"
+                    ToolTipService.ToolTip="Clear History"
+                    Margin="0,0,4,0">
+                    <Button.Resources>
+                        <ResourceDictionary>
+                            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="Transparent" Opacity="0.1"/>
+                            <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="Transparent" Opacity="0.2"/>
+                            <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="Transparent"/>
+                            <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="Transparent"/>
+                        </ResourceDictionary>
+                    </Button.Resources>
+                    <FontIcon Glyph="&#xE74D;" FontFamily="Segoe MDL2 Assets" FontSize="16" />
+                </Button>
+
+                <!-- Settings Button -->
+                <Button 
+                    Click="SettingsButton_Click"
+                    Background="Transparent"
+                    BorderBrush="Transparent"
+                    Padding="8"
+                    CornerRadius="4"
+                    VerticalAlignment="Center"
+                    ToolTipService.ToolTip="Settings">
+                    <Button.Resources>
+                        <ResourceDictionary>
+                            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="Transparent" Opacity="0.1"/>
+                            <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="Transparent" Opacity="0.2"/>
+                            <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="Transparent"/>
+                            <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="Transparent"/>
+                        </ResourceDictionary>
+                    </Button.Resources>
+                    <FontIcon Glyph="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="16" />
+                </Button>
+            </StackPanel>
         </Grid>
 
         <ListView Grid.Row="2" Margin="10 5 10 5" x:Name="ClipboardListView" />

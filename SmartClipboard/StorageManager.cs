@@ -51,5 +51,17 @@ namespace SmartClipboard {
                 return new List<ClipboardItem>();
             }
         }
+
+        public static async Task ClearClipboardItemsAsync() {
+            try {
+                if(File.Exists(ClipboardDataFile)) {
+                    await File.WriteAllTextAsync(ClipboardDataFile, "[]");
+                    System.Diagnostics.Debug.WriteLine("Clipboard data file cleared");
+                }
+            }
+            catch(Exception ex) {
+                System.Diagnostics.Debug.WriteLine($"Error clearing clipboard items: {ex.Message}");
+            }
+        }
     }
 }
