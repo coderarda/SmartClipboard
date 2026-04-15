@@ -31,6 +31,18 @@ jobs:
         fetch-depth: 0
 
     # Install the .NET Core workload
+    - name: Check if signing is available
+      id: check-signing
+      env:
+        SIGNING_PASSWORD:  ${{ secrets.SIGNING_PASSWORD }}
+      run: |
+        if ([string]::IsNullOrEmpty($env:SIGNING_PASSWORD)) {
+          echo "signing_available=false" >> $env:GITHUB_OUTPUT
+        } else {
+          echo "signing_available=true" >> $env:GITHUB_OUTPUT
+        }
+      shell: pwsh
+    
     - name: Install .NET Core
       uses: actions/setup-dotnet@v4
       with:
@@ -64,22 +76,21 @@ jobs:
       shell: pwsh
       
     - name: Import signing certificate
-      if: ${{ secrets.SIGNING_PASSWORD != '' }}
       shell: pwsh
       env:
         PFX_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
       run: |
         $secure = ConvertTo-SecureString $env:PFX_PASSWORD -AsPlainText -Force
-        $cert = Import-PfxCertificate -FilePath "GitHubActionsWorkflow.pfx" -CertStoreLocation Cert:\CurrentUser\My -Password $secure -Exportable
-        if (-not $cert) { throw "Failed to import PFX into CurrentUser\My." }
-        $thumb = $cert.Thumbprint
+        $pfxPath = Join-Path (Get-Location) "GitHubActionsWorkflow.pfx"
+        $certs = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $secure -Exportable
+        if ($null -eq $certs -or $certs.Count -eq 0) { throw "Failed to import PFX into CurrentUser\My." }
+        $thumb = ($certs | Select-Object -First 1).Thumbprint
         Write-Host "Imported certificate thumbprint: $thumb"
         echo "SigningCertThumbprint=$thumb" >> $env:GITHUB_ENV
 
 
     # Create the app package by building and packaging the project (signed)
     - name: Create the app package
-      if: ${{ secrets.SIGNING_PASSWORD != '' }}
       run: >
         msbuild $env:Solution_Name
         /p:Configuration=$env:Configuration
@@ -99,7 +110,6 @@ jobs:
 
     # Create the app package (unsigned fallback when secrets not available)
     - name: Create the app package (unsigned)
-      if: ${{ secrets.SIGNING_PASSWORD == '' }}
       run: >
         msbuild $env:Solution_Name
         /p:Configuration=$env:Configuration
@@ -117,7 +127,6 @@ jobs:
 
     # Remove the pfx
     - name: Remove the pfx
-      if: ${{ secrets.SIGNING_PASSWORD != '' }}
       run: Remove-Item -path GitHubActionsWorkflow.pfx
 
     # Upload the MSIX package: https://github.com/marketplace/actions/upload-a-build-artifact
@@ -125,4 +134,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: MSIX Package (${{ matrix.configuration }}-${{ matrix.platform }})
-        path: ${{ env.Solution_Name }}\\Packages
+        path: Packages\\
