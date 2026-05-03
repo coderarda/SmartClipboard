@@ -59,6 +59,7 @@ namespace SmartClipboard {
         [DllImport("user32.dll")]
         private static extern bool RemoveClipboardFormatListener(IntPtr hwnd);
 
+
         [DllImport("user32.dll")]
         private static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
 
@@ -164,6 +165,10 @@ namespace SmartClipboard {
                 
                 // Create or remove tray icon based on setting
                 UpdateTrayIcon();
+
+                if(minimizeToTray) {
+                    _appWindow.Hide();
+                }
             }
             catch(Exception ex) {
                 System.Diagnostics.Debug.WriteLine($"Error loading settings: {ex.Message}");
