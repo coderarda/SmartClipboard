@@ -18,19 +18,17 @@ jobs:
         configuration: [Release]
         platform: [x64, x86]
 
-    runs-on: windows-latest  # For a list of available runner types, refer to
-                             # https://help.github.com/en/actions/reference/workflow-syntax-for-github-actions#jobsjob_idruns-on
+    runs-on: windows-latest
 
     env:
-      Solution_Name: SmartClipboard.sln                       # Replace with your solution name, i.e. App1.sln.
+      Solution_Name: SmartClipboard.sln
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
-    # Install the .NET Core workload
     - name: Check if signing is available
       id: check-signing
       env:
@@ -46,27 +44,25 @@ jobs:
     - name: Install .NET Core
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 9.0.x
+        dotnet-version: 10.0.x
 
-    # Add  MSBuild to the PATH: https://github.com/microsoft/setup-msbuild
     - name: Setup MSBuild.exe
       uses: microsoft/setup-msbuild@v1.0.2
 
-    # Restore the application to populate the obj folder with RuntimeIdentifiers
     - name: Restore the application
       run: msbuild $env:Solution_Name /t:Restore /p:Configuration=$env:Configuration
       env:
         Configuration: ${{ matrix.configuration }}
 
-    # Decode the base 64 encoded pfx and save the Signing_Certificate
     - name: Decode the pfx
+      if: steps.check-signing.outputs.signing_available == 'true'
       shell: pwsh
       run: |
         $pfx_cert_byte = [System.Convert]::FromBase64String("${{ secrets.SIGNING_CERTIFICATE }}")
         [System.IO.File]::WriteAllBytes("GitHubActionsWorkflow.pfx", $pfx_cert_byte)
 
-
     - name: Verify pfx exists
+      if: steps.check-signing.outputs.signing_available == 'true'
       run: |
         if (Test-Path "GitHubActionsWorkflow.pfx") {
           Write-Host "PFX file created successfully."
@@ -76,6 +72,7 @@ jobs:
       shell: pwsh
       
     - name: Import signing certificate
+      if: steps.check-signing.outputs.signing_available == 'true'
       shell: pwsh
       env:
         PFX_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
@@ -88,9 +85,9 @@ jobs:
         Write-Host "Imported certificate thumbprint: $thumb"
         echo "SigningCertThumbprint=$thumb" >> $env:GITHUB_ENV
 
-
     # Create the app package by building and packaging the project (signed)
-    - name: Create the app package
+    - name: Create the app package (signed)
+      if: steps.check-signing.outputs.signing_available == 'true'
       run: >
         msbuild $env:Solution_Name
         /p:Configuration=$env:Configuration
@@ -98,18 +95,20 @@ jobs:
         /p:UapAppxPackageBuildMode=$env:Appx_Package_Build_Mode
         /p:AppxBundle=$env:Appx_Bundle
         /p:AppxPackageDir=$env:Appx_Package_Dir
+        /p:GenerateAppxPackageOnBuild=true
         /p:PackageCertificateThumbprint=$env:SigningCertThumbprint
         /p:PackageCertificateKeyFile=
         /p:PackageCertificatePassword=
       env:
         Appx_Bundle: Never
         Appx_Package_Build_Mode: SideloadOnly
-        Appx_Package_Dir: Packages\
+        Appx_Package_Dir: ${{ github.workspace }}\Packages\
         Configuration: ${{ matrix.configuration }}
         Platform: ${{ matrix.platform }}
 
     # Create the app package (unsigned fallback when secrets not available)
     - name: Create the app package (unsigned)
+      if: steps.check-signing.outputs.signing_available != 'true'
       run: >
         msbuild $env:Solution_Name
         /p:Configuration=$env:Configuration
@@ -117,21 +116,36 @@ jobs:
         /p:UapAppxPackageBuildMode=$env:Appx_Package_Build_Mode
         /p:AppxBundle=$env:Appx_Bundle
         /p:AppxPackageDir=$env:Appx_Package_Dir
+        /p:GenerateAppxPackageOnBuild=true
         /p:AppxPackageSigningEnabled=false
       env:
         Appx_Bundle: Never
         Appx_Package_Build_Mode: SideloadOnly
-        Appx_Package_Dir: Packages\
+        Appx_Package_Dir: ${{ github.workspace }}\Packages\
         Configuration: ${{ matrix.configuration }}
         Platform: ${{ matrix.platform }}
 
-    # Remove the pfx
     - name: Remove the pfx
-      run: Remove-Item -path GitHubActionsWorkflow.pfx
+      if: hashFiles('GitHubActionsWorkflow.pfx') != ''
+      run: Remove-Item -path GitHubActionsWorkflow.pfx -ErrorAction SilentlyContinue
+      shell: pwsh
 
-    # Upload the MSIX package: https://github.com/marketplace/actions/upload-a-build-artifact
+    # Diagnostic: list what was actually built (helps debug path issues)
+    - name: List Packages output
+      run: |
+        Write-Host "GITHUB_WORKSPACE=$env:GITHUB_WORKSPACE"
+        Write-Host "Listing root Packages folder (if exists):"
+        if (Test-Path "${{ github.workspace }}\Packages") { Get-ChildItem -Recurse "${{ github.workspace }}\Packages" | Format-List FullName } else { Write-Host "No ${{ github.workspace }}\Packages folder found" }
+        Write-Host "Listing project Packages folder (if exists):"
+        if (Test-Path "SmartClipboard\Packages") { Get-ChildItem -Recurse "SmartClipboard\Packages" | Format-List FullName } else { Write-Host "No SmartClipboard\Packages folder found" }
+        Write-Host "Fallback - search for *.msix anywhere:"
+        Get-ChildItem -Recurse -Filter *.msix -ErrorAction SilentlyContinue | Select-Object FullName | Format-List
+        Get-ChildItem -Recurse -Filter *.msixbundle -ErrorAction SilentlyContinue | Select-Object FullName | Format-List
+      shell: pwsh
+
     - name: Upload MSIX package
       uses: actions/upload-artifact@v4
       with:
         name: MSIX Package (${{ matrix.configuration }}-${{ matrix.platform }})
-        path: Packages\\
+        path: Packages/
+        if-no-files-found: warn
